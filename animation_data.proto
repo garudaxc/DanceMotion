@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+message AnimationCurve {
+    string path = 1;
+
+    enum ChannelType {
+        POSX = 0;
+        POSY = 1;
+        POSZ = 2;
+        ROTX = 3;
+        ROTY = 4;
+        ROTZ = 5;
+    }
+
+    ChannelType channel = 2;
+
+    repeated float data = 3;
+}
+
+//protoc --proto_path=./ --python_out=./ animation_data.proto
