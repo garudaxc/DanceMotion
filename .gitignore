@@ -101,6 +101,9 @@ venv.bak/
 /site
 
 # mypy
+
 .mypy_cache/
+resource/
 .DS_Store
+*.meta
 animation_data_pb2.py

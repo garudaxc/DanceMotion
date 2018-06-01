@@ -1,6 +1,8 @@
 syntax = "proto3";
 
-message AnimationCurve {
+package AnimationSerialize;
+
+message CurveData {
     string path = 1;
 
     enum ChannelType {
@@ -10,11 +12,22 @@ message AnimationCurve {
         ROTX = 3;
         ROTY = 4;
         ROTZ = 5;
+        ROTW = 5;
     }
 
     ChannelType channel = 2;
 
-    repeated float data = 3;
+	message Key {
+		float time = 1;
+		float value = 2;
+		float tangent = 3;
+	}
+
+    repeated Key data = 3;
+}
+
+message ClipData {
+	repeated CurveData curves = 1;
 }
 
 //protoc --proto_path=./ --python_out=./ animation_data.proto
