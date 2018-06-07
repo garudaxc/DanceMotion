@@ -66,8 +66,28 @@ namespace AnimationSerialize
             [global::ProtoBuf.ProtoEnum(Name = @"ROTZ")]
             Rotz = 5,
             [global::ProtoBuf.ProtoEnum(Name = @"ROTW")]
-            Rotw = 5,
+            Rotw = 6,
         }
+
+    }
+
+    [global::ProtoBuf.ProtoContract()]
+    public partial class JointNode
+    {
+        public JointNode()
+        {
+            Name = "";
+            OnConstructor();
+        }
+
+        partial void OnConstructor();
+
+        [global::ProtoBuf.ProtoMember(1, Name = @"name")]
+        [global::System.ComponentModel.DefaultValue("")]
+        public string Name { get; set; }
+
+        [global::ProtoBuf.ProtoMember(2, Name = @"parent")]
+        public int Parent { get; set; }
 
     }
 
@@ -76,13 +96,17 @@ namespace AnimationSerialize
     {
         public ClipData()
         {
+            Joints = new global::System.Collections.Generic.List<JointNode>();
             Curves = new global::System.Collections.Generic.List<CurveData>();
             OnConstructor();
         }
 
         partial void OnConstructor();
 
-        [global::ProtoBuf.ProtoMember(1, Name = @"curves")]
+        [global::ProtoBuf.ProtoMember(1, Name = @"joints")]
+        public global::System.Collections.Generic.List<JointNode> Joints { get; private set; }
+
+        [global::ProtoBuf.ProtoMember(2, Name = @"curves")]
         public global::System.Collections.Generic.List<CurveData> Curves { get; private set; }
 
     }

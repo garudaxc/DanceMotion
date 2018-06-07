@@ -4,6 +4,7 @@ using UnityEditor;
 using AnimationSerialize;
 using System.IO;
 using ProtoBuf;
+using System.Collections.Generic;
 
 public class AnimationData : EditorWindow {
 	string myString = "Hello World";
@@ -37,11 +38,25 @@ public class AnimationData : EditorWindow {
         animFig_ = (GameObject)EditorGUILayout.ObjectField(animFig_, typeof(GameObject));
         animation_ = (AnimationClip)EditorGUILayout.ObjectField(animation_, typeof(AnimationClip));
 
-        if (animation_ != null && GUILayout.Button("Read Animation Data"))
-        {
-            LoadAnimationData();
-        }		
+        if (animFig_ != null && GUILayout.Button("Extruct Feature")) {
+            CallExtractMotionFeature();
+        }
+
+        //if (animation_ != null)
+        //{
+        //    LoadAnimationData();
+        //}
 	}
+
+    void CallExtractMotionFeature() {
+        if (animFig_ == null) {
+            Debug.Log("please assign animation fig");
+            return;
+        }
+
+        ExtractMotionFeatures extractor = animFig_.GetComponent<ExtractMotionFeatures>();
+        extractor.ExtractFeatures();
+    }
 
     CurveData.ChannelType GetChannelType(string name) {
         if (name == "m_LocalPosition.x") {
@@ -63,14 +78,34 @@ public class AnimationData : EditorWindow {
         throw new System.Exception("unknow animation channel");
     }
 
+    void TranversCollectJoints_r(GameObject go, int parent, List<JointNode> list) {
+
+        JointNode joint = new JointNode() {
+            Name = go.name,
+            Parent = parent
+        };
+
+        list.Add(joint);
+        int index = list.Count - 1;
+
+        for(int i = 0; i < go.transform.childCount; i++) {
+            TranversCollectJoints_r(go.transform.GetChild(i).gameObject, index, list);
+        }        
+    }
+    
     void LoadAnimationData() {
-        //if (animFig_ == null) {
-        //    Debug.Log("please assign animation fig");
-        //    return;
-        //}
+        if (animFig_ == null) {
+            Debug.Log("please assign animation fig");
+            return;
+        }
 
         ClipData clipData = new ClipData();
 
+        TranversCollectJoints_r(animFig_, -1, clipData.Joints);
+        foreach(var j in clipData.Joints) {
+            Debug.Log(j.Name);
+        }
+        
         var bindings = AnimationUtility.GetCurveBindings(animation_);
         for (int i = 0; i < bindings.Length; i++) {
             var binding = bindings[i];
@@ -111,6 +146,23 @@ public class AnimationData : EditorWindow {
         using (var file = File.Create("I:/clipData.bin")) {
             Serializer.Serialize(file, clipData);
         }
+
+    }
+
+    void ExtractingMotionFeatures() {
+        //Based on these individual frames’ motion 
+        //feature values, we can further extract each feature’s mean,
+        //median, variance, and also the mean, median, and variance
+        //of the feature’s first order forward finite difference.
+
+        // find curve
+        //// find node
+        //string[] jointName = new string[] {
+        //    "Bip01 L UpperArm", "Bip01 R UpperArm", };
+        
+
+        // extract distance
+        // extract rotation
 
     }
 }

@@ -2,16 +2,31 @@ import google.protobuf
 import animation_data_pb2
 
 
-a = animation_data_pb2.AnimationCurve()
 
-print(type(a))
-print(type(a.path))
+def Test():
+    clip = animation_data_pb2.ClipData()
 
-print(type(a.data))
+    #print(type(a))
+    #print(type(a.path))
 
-a.path = '123'
-a.data.append(1.0)
-print(a)
+    #print(type(a.data))
 
-buf = a.SerializeToString()
-print(buf)
+    #a.path = '123'
+    #a.data.append(1.0)
+    #print(a)
+
+    #buf = a.SerializeToString()
+    #print(buf)
+
+    print(dict(clip.joints))
+    with open('I:/clipData.bin', 'rb') as f:
+        a = f.read()
+    clip.ParseFromString(a)
+    print(clip.joints[0])
+
+
+
+
+
+if __name__ == '__main__':
+    Test()
