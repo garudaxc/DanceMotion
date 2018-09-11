@@ -1,11 +1,15 @@
 ﻿using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
+using System.IO;
 
 public class ExtractMotionFeatures : MonoBehaviour {
 
     public Transform[] joints;
     public Transform reference;
     public float CurrentTime = 0.0f;
+
+    public string OutputPath;
     
 	// Use this for initialization
 	void Start () {
@@ -34,22 +38,63 @@ public class ExtractMotionFeatures : MonoBehaviour {
 
         AnimationState state = animation["Take 001"];
         //Debug.Log("time " + state.time);
-
-        state.time = this.CurrentTime;
+        
         state.weight = 1.0f;
         state.enabled = true;
 
+        //string s = FormatVector(joints[0].localPosition);
+        //Debug.Log("local pos " + s);
+        //s = FormatVector(joints[0].localEulerAngles);
+        //Debug.Log("localEulerAngles " + s);
+        //s = FormatVector(joints[0].position);
+        //Debug.Log("position " + s);
+        //s = FormatVector(joints[0].eulerAngles);
+        //Debug.Log("eulerAngles " + s);
+
+        float dt = 0.0333333f;
+
+        Quaternion[] prevRot = new Quaternion[joints.Length];
+        // init rotation to first frame
+        state.time = 0.0f;
         animation.Sample();
+        for (int i = 0; i < joints.Length; i++) {
+            prevRot[i] = joints[i].localRotation;
+        }
 
-        state.enabled = false;
+        var featureData = new List<float>();
+        int numSamples = (int)(state.length / dt);
+        
+        for (int i = 0; i < numSamples; i++) {
+            float time = dt * i;
+            state.time = time;
+            animation.Sample();
 
-        string s = FormatVector(joints[0].localPosition);
-        Debug.Log("local pos " + s);
-        s = FormatVector(joints[0].localEulerAngles);
-        Debug.Log("localEulerAngles " + s);
-        s = FormatVector(joints[0].position);
-        Debug.Log("position " + s);
-        s = FormatVector(joints[0].eulerAngles);
-        Debug.Log("eulerAngles " + s);
+            featureData.Add(time);
+            Vector3 refPos = reference.position;
+            for (int j = 0; j < joints.Length; j++) {
+                float dis = (joints[j].position - refPos).magnitude;
+                Quaternion q = joints[j].localRotation;
+                float omiga = Quaternion.Angle(q, prevRot[j]);
+                prevRot[j] = q;
+
+                featureData.Add(dis);
+                featureData.Add(omiga);
+            }
+        }
+
+        Debug.LogFormat("feature data {0} frames {1} joints {2} floats", numSamples, joints.Length, numSamples * joints.Length * 2);
+
+        FileStream fs = new FileStream(OutputPath, FileMode.Create, FileAccess.Write);
+        BinaryWriter bw = new BinaryWriter(fs);
+
+        bw.Write(numSamples);
+        foreach (var d in featureData) {
+            bw.Write(d);
+        }
+
+        bw.Close();
+        fs.Close();
+
+        Debug.LogFormat("write file {0}", OutputPath);
     }
 }
