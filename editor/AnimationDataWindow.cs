@@ -1,5 +1,4 @@
 ﻿using UnityEngine;
-using System.Collections;
 using UnityEditor;
 using AnimationSerialize;
 using System.IO;
@@ -7,17 +6,17 @@ using ProtoBuf;
 using System.Collections.Generic;
 
 public class AnimationDataWindow : EditorWindow {
-	string myString = "Hello World";
-	bool groupEnabled;
-	bool myBool = true;
-	float myFloat = 1.23f;
+    //string myString = "Hello World";
+    //bool groupEnabled;
+    //bool myBool = true;
+    //float myFloat = 1.23f;
 
 
     static AnimationClip animation_;
     static GameObject animFig_;
 	
 	// Add menu named "My Window" to the Window menu
-	[MenuItem ("MyMenu/My Window2")]
+	[MenuItem ("DanceMotion/DanceMotion")]
 	static void Init () {
         // Get existing open window or if none, make a new one:
         AnimationDataWindow window = (AnimationDataWindow)EditorWindow.GetWindow (typeof (AnimationDataWindow));
@@ -27,15 +26,15 @@ public class AnimationDataWindow : EditorWindow {
 	void OnGUI () {      
         		
 		GUILayout.Label ("Base Settings", EditorStyles.boldLabel);
-		myString = EditorGUILayout.TextField ("Text Field", myString);
+		//myString = EditorGUILayout.TextField ("Text Field", myString);
+  //      animation_ = (AnimationClip)EditorGUILayout.ObjectField(animation_, typeof(AnimationClip));
 		
 		//groupEnabled = EditorGUILayout.BeginToggleGroup ("Optional Settings", groupEnabled);
 		//myBool = EditorGUILayout.Toggle ("Toggle", myBool);
 		//myFloat = EditorGUILayout.Slider ("Slider", myFloat, -3, 3);
         //EditorGUILayout.EndToggleGroup();
 
-        animFig_ = (GameObject)EditorGUILayout.ObjectField(animFig_, typeof(GameObject));
-        animation_ = (AnimationClip)EditorGUILayout.ObjectField(animation_, typeof(AnimationClip));
+        //animFig_ = (GameObject)EditorGUILayout.ObjectField(animFig_, typeof(GameObject));
 
 
         if (GUILayout.Button("Extruct Feature")) {
@@ -44,11 +43,17 @@ public class AnimationDataWindow : EditorWindow {
             ExtractingMotionFeatures();
         }
 
+        if (GUILayout.Button("Motion Similarity")) {
+            Debug.ClearDeveloperConsole();
+            var calc = new MotionSimilarity();
+            calc.Do();
+        }
+
         //if (animation_ != null)
         //{
         //    LoadAnimationData();
         //}
-	}
+    }
 
     void CallExtractMotionFeature() {
         if (animFig_ == null) {
@@ -150,20 +155,6 @@ public class AnimationDataWindow : EditorWindow {
         }
     }
 
-    GameObject FindGameObjectByName_r(GameObject go, string name) {
-        if (go.name.Equals(name)) {
-            return go;
-        }
-
-        foreach(Transform child in go.transform) {
-            var found = FindGameObjectByName_r(child.gameObject, name);
-            if (found != null) {
-                return found;
-            }
-        }
-
-        return null;
-    }
 
     void ExtractingMotionFeatures(Transform[] joints, Animation animation, Dictionary<string, float> musicInfo, string outputFile) {
 
@@ -234,37 +225,10 @@ public class AnimationDataWindow : EditorWindow {
         fs.Close();
 
         Debug.LogFormat("write file {0}", outputFile);
-    }
-
-    Dictionary<string, float> LoadMusicInfo(string path) {
-        string filename = Path.Combine(path, "info.txt");
-        if (!File.Exists(filename)) {
-            Debug.LogErrorFormat("can not find file {0}", filename);
-            return null;
-        }
-
-        string[] lines = File.ReadAllLines(filename);
-
-        Dictionary<string, float> dic = new Dictionary<string, float>();
-
-        foreach(var l in lines) {
-            string[] s = l.Split(new char[] { '=' });
-            if (s != null) {
-                float val = float.Parse(s[1]);
-                dic.Add(s[0], val);
-            }
-        }
-
-        return dic;
-    }
-
+    }    
 
     void ExtractingMotionFeatures() {
         
-        //Quaternion[] q = new Quaternion[3];
-        //Debug.LogFormat("quaternion : {0}", q[0].ToString());
-        //return;
-
         //Based on these individual frames’ motion 
         //feature values, we can further extract each feature’s mean,
         //median, variance, and also the mean, median, and variance
@@ -286,7 +250,7 @@ public class AnimationDataWindow : EditorWindow {
         string path = AssetDatabase.GetAssetPath(select);
         path = Path.GetDirectoryName(path);
 
-        var musicInfo = LoadMusicInfo(path);
+        var musicInfo = Utility.LoadMusicInfo(path);
 
         path = Path.Combine(path, "motion_feature.bin");
 
@@ -311,7 +275,7 @@ public class AnimationDataWindow : EditorWindow {
         Transform[] joints = new Transform[jointName.Length];
 
         for (int i = 0; i < jointName.Length; i++) {
-            GameObject o = FindGameObjectByName_r(fig, jointName[i]);
+            GameObject o = Utility.FindGameObjectByName_r(fig, jointName[i]);
             if (o == null) {
                 Debug.LogFormat("can not found gameobject {0}", jointName[i]);
             } else {
@@ -322,5 +286,7 @@ public class AnimationDataWindow : EditorWindow {
 
         ExtractingMotionFeatures(joints, animation, musicInfo, path);
     }
+
+
 }
 

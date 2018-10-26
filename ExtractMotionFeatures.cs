@@ -5,25 +5,28 @@ using System.IO;
 
 public class ExtractMotionFeatures : MonoBehaviour {
 
-    public Transform[] joints;
-    public Transform reference;
-    public float CurrentTime = 0.0f;
+    Transform[] joints;
+    Transform reference;
+    float CurrentTime = 0.0f;
+    string OutputPath;
 
-    public string OutputPath;
+    new AudioSource audio;
     
 	// Use this for initialization
 	void Start () {
-        Animation animation = GetComponent<Animation>();
-        AnimationState state = animation["Take 001"];
-        state.enabled = false;
+        //Animation animation = GetComponent<Animation>();
+        //AnimationState state = animation["Take 001"];
+        //state.enabled = false;
 
-        Debug.Log("animation length " + state.length);
+        //Debug.Log("animation length " + state.length);
+
+        audio = gameObject.GetComponent<AudioSource>();
     }
-	
-	// Update is called once per frame
-	void Update () {
-	
-	}
+
+    void OnGUI() {
+        var t = string.Format("{0:F2}", audio.time);
+        GUI.Label(new Rect(0.0f, 0.0f, 100.0f, 100.0f), t);
+    }
 
     static string FormatVector(Vector3 v) {
         string s = string.Format("{0:f7}, {1:f7}, {2:f7}", v.x, v.y, v.z);
