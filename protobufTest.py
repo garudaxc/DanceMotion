@@ -57,7 +57,6 @@ def PrepareMusicFeature():
     # music info
     pathname = GetMp3PathName(song)
     
-    pathname = 'i:/DanceMotion/Mixdown.mp3'
 
     #duration, bpm, et = LevelInfo.LoadMusicInfo(pathname)
     #print(duration, bpm, et)

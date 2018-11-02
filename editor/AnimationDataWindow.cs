@@ -11,12 +11,17 @@ public class AnimationDataWindow : EditorWindow {
     //bool myBool = true;
     //float myFloat = 1.23f;
 
+    public int CurrIndex = 0;
+
+    MotionSimilarity ms_ = new MotionSimilarity();
+
 
     static AnimationClip animation_;
-    static GameObject animFig_;
-	
-	// Add menu named "My Window" to the Window menu
-	[MenuItem ("DanceMotion/DanceMotion")]
+    static GameObject animFig0_;
+    static GameObject animFig1_;
+
+    // Add menu named "My Window" to the Window menu
+    [MenuItem ("DanceMotion/DanceMotion")]
 	static void Init () {
         // Get existing open window or if none, make a new one:
         AnimationDataWindow window = (AnimationDataWindow)EditorWindow.GetWindow (typeof (AnimationDataWindow));
@@ -26,15 +31,18 @@ public class AnimationDataWindow : EditorWindow {
 	void OnGUI () {      
         		
 		GUILayout.Label ("Base Settings", EditorStyles.boldLabel);
-		//myString = EditorGUILayout.TextField ("Text Field", myString);
-  //      animation_ = (AnimationClip)EditorGUILayout.ObjectField(animation_, typeof(AnimationClip));
-		
-		//groupEnabled = EditorGUILayout.BeginToggleGroup ("Optional Settings", groupEnabled);
-		//myBool = EditorGUILayout.Toggle ("Toggle", myBool);
-		//myFloat = EditorGUILayout.Slider ("Slider", myFloat, -3, 3);
+        //myString = EditorGUILayout.TextField ("Text Field", myString);
+        //      animation_ = (AnimationClip)EditorGUILayout.ObjectField(animation_, typeof(AnimationClip));
+
+        //groupEnabled = EditorGUILayout.BeginToggleGroup ("Optional Settings", groupEnabled);
+        //myBool = EditorGUILayout.Toggle ("Toggle", myBool);
+        //myFloat = EditorGUILayout.Slider ("Slider", myFloat, -3, 3);
         //EditorGUILayout.EndToggleGroup();
 
-        //animFig_ = (GameObject)EditorGUILayout.ObjectField(animFig_, typeof(GameObject));
+        CurrIndex = EditorGUILayout.IntField(CurrIndex);
+
+        animFig0_ = (GameObject)EditorGUILayout.ObjectField(animFig0_, typeof(GameObject), true);
+        animFig1_ = (GameObject)EditorGUILayout.ObjectField(animFig1_, typeof(GameObject), true);
 
 
         if (GUILayout.Button("Extruct Feature")) {
@@ -45,9 +53,14 @@ public class AnimationDataWindow : EditorWindow {
 
         if (GUILayout.Button("Motion Similarity")) {
             Debug.ClearDeveloperConsole();
-            var calc = new MotionSimilarity();
-            calc.Do();
+            ms_.Do();
         }
+
+        if (GUILayout.Button("Play Motion")) {
+            Debug.ClearDeveloperConsole();
+            PlaySimilarMotion(animFig0_, animFig1_);
+        }
+
 
         //if (animation_ != null)
         //{
@@ -55,15 +68,6 @@ public class AnimationDataWindow : EditorWindow {
         //}
     }
 
-    void CallExtractMotionFeature() {
-        if (animFig_ == null) {
-            Debug.Log("please assign animation fig");
-            return;
-        }
-
-        ExtractMotionFeatures extractor = animFig_.GetComponent<ExtractMotionFeatures>();
-        extractor.ExtractFeatures();
-    }
 
     CurveData.ChannelType GetChannelType(string name) {
         if (name == "m_LocalPosition.x") {
@@ -101,17 +105,17 @@ public class AnimationDataWindow : EditorWindow {
     }
     
     void LoadAnimationData() {
-        if (animFig_ == null) {
-            Debug.Log("please assign animation fig");
-            return;
-        }
+        //if (animFig_ == null) {
+        //    Debug.Log("please assign animation fig");
+        //    return;
+        //}
 
-        ClipData clipData = new ClipData();
+        //ClipData clipData = new ClipData();
 
-        TranversCollectJoints_r(animFig_, -1, clipData.Joints);
-        foreach(var j in clipData.Joints) {
-            Debug.Log(j.Name);
-        }
+        //TranversCollectJoints_r(animFig_, -1, clipData.Joints);
+        //foreach(var j in clipData.Joints) {
+        //    Debug.Log(j.Name);
+        //}
         
         var bindings = AnimationUtility.GetCurveBindings(animation_);
         for (int i = 0; i < bindings.Length; i++) {
@@ -145,14 +149,14 @@ public class AnimationDataWindow : EditorWindow {
                 curveTo.Datas.Add(key);
             }
 
-            clipData.Curves.Add(curveTo);
+            //clipData.Curves.Add(curveTo);
         }
 
-        Debug.Log("got curves " + clipData.Curves.Count);
+        //Debug.Log("got curves " + clipData.Curves.Count);
 
-        using (var file = File.Create("I:/clipData.bin")) {
-            Serializer.Serialize(file, clipData);
-        }
+        //using (var file = File.Create("I:/clipData.bin")) {
+        //    Serializer.Serialize(file, clipData);
+        //}
     }
 
 
@@ -287,6 +291,48 @@ public class AnimationDataWindow : EditorWindow {
         ExtractingMotionFeatures(joints, animation, musicInfo, path);
     }
 
+    void PlaySimilarMotion(GameObject go0, GameObject go1) {
+
+        var cost = ms_.GetCostEstimate();
+        int i = MotionSimilarity.FindSmallestAfter(cost, CurrIndex, float.NegativeInfinity, float.PositiveInfinity);
+
+        Debug.LogFormat("curr {0} index {1} value {2}", CurrIndex, i, cost[i]);
+        CurrIndex++;
+        
+
+        //var miniFrame = ms_.GetMinimunCostFrame();
+
+        var miniFrame = ms_.MotionFrameByIndex(i);
+
+        var frame0 = ms_.GetFrameData(miniFrame.index0);
+        var frame1 = ms_.GetFrameData(miniFrame.index1);
+        
+        Debug.LogFormat("mini cost {0}, song({1}, {2}), {3}, {4}",
+            miniFrame.minCost, frame0.name, frame1.name,
+            miniFrame.beat0, miniFrame.beat1);
+
+        PrepareSimilarMotion(go0, frame0, miniFrame.beat0);
+        PrepareSimilarMotion(go1, frame1, miniFrame.beat1);
+    }
+
+    void PrepareSimilarMotion(GameObject go, MotionSimilarity.FrameData frame, int beat) {
+        Animation anim = go.GetComponent<Animation>();
+        foreach (AnimationState state in anim) {
+            anim.RemoveClip(state.clip);
+        }
+        anim.clip = null;
+        
+        string resName = string.Format("Assets/DanceMotion/resource/{0}/Take 001.anim", frame.name);
+        var res = (AnimationClip)AssetDatabase.LoadAssetAtPath(resName, typeof(AnimationClip));
+        anim.AddClip(res, "Take 001");
+        anim.clip = res;
+
+        float time = frame.startTime + beat * frame.beatTime;
+        var script = go.GetComponent<ExtractMotionFeatures>();
+        script.StartTime = time;
+        script.BeatTime = frame.beatTime;
+        script.Init();
+    }
 
 }
 
