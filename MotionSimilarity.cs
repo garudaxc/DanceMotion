@@ -77,7 +77,7 @@ public class MotionSimilarity
         return frame;
     }
 
-    List<FrameData> IndexMotionSeg() {
+    public List<FrameData> IndexMotionSeg() {
         var path = "Assets/DanceMotion/resource/";
         var dirs = Directory.GetDirectories(path);
         Array.Sort(dirs);
@@ -167,6 +167,8 @@ public class MotionSimilarity
             float invdt = 1.0f / dt;
 
             int numSamples = frame.numBeats * NumSamplesPerBeat;
+            Debug.LogFormat("name {0} numSamples {1}", frame.name, numSamples);
+
             frame.q = new Quaternion[frame.numBeats * NumSamplesPerBeat, joints.Length];
 
             for (int i = 0; i < numSamples; i++) {

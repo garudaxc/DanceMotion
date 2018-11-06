@@ -7,8 +7,6 @@ import os.path
 root = 'i:/work/DanceMotion/Assets/DanceMotion/resource/'
 
 
-
-
 def PrepareTrainData():
     files = os.listdir(root)
 
@@ -22,13 +20,8 @@ def PrepareTrainData():
             print('error, can not find file ', name)
             continue
 
-
-
         mp3files.append(name)
         print(name)
-
-
-
 
 
 

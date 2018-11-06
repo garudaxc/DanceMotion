@@ -1,16 +1,14 @@
 import sys
 sys.path.append('I:/librosa/MusicLevelAutoGen/')
 
-import google.protobuf
-import animation_data_pb2
 from struct import *
 import numpy as np
 import os
 import matplotlib.pyplot as plt
 import postprocess
-import DownbeatTracking
 import LevelInfo
 import myprocesser
+import librosa
 
 
 def Test():
@@ -50,52 +48,68 @@ def GetMotionFeature(song):
 
     return data
 
+def LoadMusicInfo(filename):
+    '''
+    读取歌曲的长度,bpm,entertime等信息
+    '''
+    # filename = r'd:\librosa\RhythmMaster\jilejingtu\jilejingtu.mp3'
+    dir = os.path.dirname(filename) + os.path.sep
+    filename = dir + 'info.txt'
+    with open(filename, 'r') as file:
+        value = [s.strip('\n').split('=') for s in file.readlines()]
+        info ={}
+        for v in value:
+            info[v[0]] = float(v[1])
 
-def PrepareMusicFeature():
-    song = 'loveydovey'        
+        print(info)
+
+        return info
+
+
+def PrepareMusicFeature(filename=None, musicInfo=None):
+    song = 'ah'        
 
     # music info
     pathname = GetMp3PathName(song)
+    musicInfo = LoadMusicInfo(pathname)
     
+    bpm = musicInfo["bpm"]
+    enterTime = musicInfo["et"]
+    motionStart = musicInfo["start"]
+    motionEnd = musicInfo["end"]
 
-    #duration, bpm, et = LevelInfo.LoadMusicInfo(pathname)
-    #print(duration, bpm, et)
-    #duration = duration / 1000.0
-    #et = et / 1000.0
-    #print('diring', duration)
+    beat = 60.0 / bpm
 
-    processer = myprocesser.CreateMFCCProcesserForMotion()
+    start = max(enterTime, motionStart)
+    start = start - (start - enterTime) % beat + beat
+    end = motionEnd - (motionEnd - enterTime) % beat
+    numBeats = int((end - start) / beat)
+    
+    fps = 1.0 / (beat / 7.0)
+
+    processer = myprocesser.CreateMFCCProcesserForMotion(fps, start=start, stop=end)
     feature = processer(pathname)
-    print('feature', feature.shape)
+        
+    #print('feature', feature.shape)
 
-    print(feature[0:50, [0, 1]])
+    return feature
 
 
-def VisualMotionFeature():
-    song = 'loveydovey'        
+
+def VisualMotionFeature(filename=None, musicInfo=None):
+    song = 'ah'
 
     # music info
-    pathname = GetMp3PathName(song)    
-    duration, bpm, et = LevelInfo.LoadMusicInfo(pathname)
-    print(duration, bpm, et)
-    duration = duration / 1000.0
-    et = et / 1000.0
-
-    beatInt = 60.0 / bpm
-    beats = np.arange(et, duration, beatInt)
-    numBeats = beats.shape[0]
-    print('numBeat', numBeats)
-    PrintTimePosToFile(beats, 'beat')
+    pathname = GetMp3PathName(song)
 
     data = GetMotionFeature(song)
 
     offset = 0
-    (numSamples, floatsPerSample), offset = UnpackData('2i', data, offset)
-    (startTime, deltaT, samplePerBeat), offset = UnpackData('2fi', data, offset)
-
-    print('samples', numSamples, 'floatsPerSample', floatsPerSample, 'deltaT', deltaT, 'samplePerBeat', samplePerBeat)
+    (numSamples, samplePerBeat, floatsPerSample, deltaT), offset = UnpackData('3if', data, offset)
+    print('samples', numSamples, 'samplePerBeat', samplePerBeat, 'floatsPerSample', floatsPerSample, 'deltaT', deltaT)
 
     numBeats = int(numSamples / samplePerBeat)
+    print('numbeats', numBeats)
 
     fmt = str(numSamples * floatsPerSample)+'f'
     featureData, offset = UnpackData('%df' % (numSamples * floatsPerSample), data, offset)
@@ -109,21 +123,19 @@ def VisualMotionFeature():
 
     # calc forward difference
     featureDiff = (featureData[1:, :] - featureData[:-1, :]) / deltaT
-    featureData = np.hstack((featureData[:-1, :], featureDiff))
+    featureDiff = np.concatenate((featureDiff, featureDiff[[-1], :]), axis=0)
+
+    # featureData = np.hstack((featureData, featureDiff))
+    featureData = np.concatenate((featureData, featureDiff), axis=1)
     floatsPerSample = featureData.shape[1]
 
-    print('feature shape0', featureData.shape)
+    numFilteredSamples = numBeats * 7
+    step = 3
 
-    windowsSize = (int)(2 * (samplePerBeat/7))
-
-    #featureData = featureData[:-(numSamples%samplePerBeat),:]
-    featureData = featureData[:numBeats*samplePerBeat,:]
-    print('feature shape1', featureData.shape)
+    assert (numFilteredSamples * step) == featureData.shape[0]
 
     newFeature = []
-    step = samplePerBeat / 7.0
-    stepTime = deltaT * step
-    for i in range(numBeats*7):
+    for i in range(numFilteredSamples):
         start = int((i-1) * step)
         end = int((i+1) * step)
         if start < 0:
@@ -136,24 +148,22 @@ def VisualMotionFeature():
 
         data = np.hstack((mean, med, variance))
 
-        #print(data.shape)
-        #break
-
         newFeature.append(data)
 
-    featureData = np.array(newFeature)
-    
-    print('feature shape2', featureData.shape)
+    featureData = np.array(newFeature)    
   
     smin = np.amin(featureData, 0)
-    print('smin', smin.shape)
     smax = np.amax(featureData, 0)
     featureData = featureData - smin
     r = smax - smin
     r[r < 0.00001] = 1.0
     featureData = featureData / r
     
+    print('feature shape', featureData.shape)
+
+    return featureData
  
+    # stepTime = deltaT * step
     #beatTimes = np.arange(startTime, numBeats * 7 * stepTime + startTime, stepTime)
     #mean = featureData[:, 0:21]
     #diffmean = featureData[:, 21:42]
@@ -241,7 +251,7 @@ def ProcessSamples():
 if __name__ == '__main__':
     #Test()
     VisualMotionFeature()
-    #PrepareMusicFeature()
+    # PrepareMusicFeature()
 
     #CalcDanceMusicInfo()
 
