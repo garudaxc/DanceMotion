@@ -61,13 +61,10 @@ def LoadMusicInfo(filename):
         for v in value:
             info[v[0]] = float(v[1])
 
-        print(info)
-
         return info
 
 
-def PrepareMusicFeature(filename=None, musicInfo=None):
-    song = 'ah'        
+def PrepareMusicFeature(song):
 
     # music info
     pathname = GetMp3PathName(song)
@@ -83,22 +80,29 @@ def PrepareMusicFeature(filename=None, musicInfo=None):
     start = max(enterTime, motionStart)
     start = start - (start - enterTime) % beat + beat
     end = motionEnd - (motionEnd - enterTime) % beat
-    numBeats = int((end - start) / beat)
+    numBeats = round((end - start) / beat)
+    numFrames = numBeats * 7
+    
+    #print('start', start, 'end', end)
+    #print('num beat', numBeats, 'frames', numBeats * 7)
     
     fps = 1.0 / (beat / 7.0)
 
     processer = myprocesser.CreateMFCCProcesserForMotion(fps, start=start, stop=end)
     feature = processer(pathname)
+
+    if feature.shape[0] != numFrames:
+        feature = feature[:numFrames, :]
+
+    assert feature.shape[0] == numFrames
         
-    #print('feature', feature.shape)
+    print('music feature', feature.shape)
 
     return feature
 
 
 
-def VisualMotionFeature(filename=None, musicInfo=None):
-    song = 'ah'
-
+def PrepareMotionFeature(song='ah'):
     # music info
     pathname = GetMp3PathName(song)
 
@@ -106,10 +110,9 @@ def VisualMotionFeature(filename=None, musicInfo=None):
 
     offset = 0
     (numSamples, samplePerBeat, floatsPerSample, deltaT), offset = UnpackData('3if', data, offset)
-    print('samples', numSamples, 'samplePerBeat', samplePerBeat, 'floatsPerSample', floatsPerSample, 'deltaT', deltaT)
+    #print('samples', numSamples, 'samplePerBeat', samplePerBeat, 'floatsPerSample', floatsPerSample, 'deltaT', deltaT)
 
-    numBeats = int(numSamples / samplePerBeat)
-    print('numbeats', numBeats)
+    numBeats = round(numSamples / samplePerBeat)
 
     fmt = str(numSamples * floatsPerSample)+'f'
     featureData, offset = UnpackData('%df' % (numSamples * floatsPerSample), data, offset)
@@ -150,7 +153,7 @@ def VisualMotionFeature(filename=None, musicInfo=None):
 
         newFeature.append(data)
 
-    featureData = np.array(newFeature)    
+    featureData = np.array(newFeature)
   
     smin = np.amin(featureData, 0)
     smax = np.amax(featureData, 0)
@@ -159,15 +162,11 @@ def VisualMotionFeature(filename=None, musicInfo=None):
     r[r < 0.00001] = 1.0
     featureData = featureData / r
     
-    print('feature shape', featureData.shape)
+    print('motion feature shape', featureData.shape)
+
 
     return featureData
  
-    # stepTime = deltaT * step
-    #beatTimes = np.arange(startTime, numBeats * 7 * stepTime + startTime, stepTime)
-    #mean = featureData[:, 0:21]
-    #diffmean = featureData[:, 21:42]
-    #variance = featureData[:, 84:105]
 
     #samples = np.vstack((beatTimes, mean[:, 6])).T
     #PrintFeatureToFile(samples, 'mean_6')
@@ -176,18 +175,9 @@ def VisualMotionFeature(filename=None, musicInfo=None):
     #PrintFeatureToFile(samples, 'diffmean_6')
 
     #samples = np.vstack((beatTimes, mean[:, 14])).T
-    #PrintFeatureToFile(samples, 'mean_14')
-    #samples = np.vstack((beatTimes, mean[:, 16])).T
-    #PrintFeatureToFile(samples, 'mean_16')
-    #samples = np.vstack((beatTimes, variance[:, 6])).T
-    #PrintFeatureToFile(samples, 'variance_6')
-    #samples = np.vstack((beatTimes, variance[:, 14])).T
-    #PrintFeatureToFile(samples, 'variance_14')
-    #samples = np.vstack((beatTimes, variance[:, 16])).T
-    #PrintFeatureToFile(samples, 'variance_16')
+    #PrintFeatureToFile(samples, 'mean_14')   
 
     #print(times)
-
 
     #start = 10
     #count = 10
@@ -244,15 +234,54 @@ def CalcDanceMusicInfo():
     for f in mp3files:
         DownbeatTracking.CalcMusicInfoFromFile(f)
 
-def ProcessSamples():
-    pass
+
+def LoadMotionSimilarity():
+    path = 'i:/work/DanceMotion/MotionCost.bin'
+    with open(path, 'rb') as f:
+        data = f.read()
+    offset = 0
+    numMotions, offset = UnpackData('i', data, offset)
+    numMotions = numMotions[0]
+    #print('numMotions', numMotions)
+
+    numBeats = []
+    for i in range(numMotions):
+        slen, offset = UnpackData('i', data, offset)
+        fmt = '=%dsi' % (slen[0])
+        (name, numBeat), offset = UnpackData(fmt, data, offset)
+        name = name.decode()
+
+        numBeats.append(numBeat)
+
+        #print(name, numBeat)
+
+    numCost, offset = UnpackData('=i', data, offset)
+    #print('cost count', numCost[0])
+    fmt = '=%df' % (numCost[0])
+    cost, offset = UnpackData(fmt, data, offset)
+    assert offset == len(data)
+
+    cost = np.array(cost)    
+    smin = np.amin(cost)
+    smax = np.amax(cost)
+    cost = cost - smin
+    r = smax - smin
+    #print('cost max %f min %f' % (smax, smin))
+
+    assert r > 1000.0
+    cost = cost / r 
+    smin = np.amin(cost)
+    smax = np.amax(cost)
+    #print('cost max %f min %f' % (smax, smin))
+
+    return numBeats, cost
+
 
 
 if __name__ == '__main__':
     #Test()
-    VisualMotionFeature()
-    # PrepareMusicFeature()
-
+    #PrepareMotionFeature('loveydovey')
+    #PrepareMusicFeature('loveydovey')
     #CalcDanceMusicInfo()
 
-
+    LoadMotionSimilarity()

@@ -4,8 +4,9 @@ using AnimationSerialize;
 using System.IO;
 using ProtoBuf;
 using System.Collections.Generic;
+using System.Threading;
 
-public class AnimationDataWindow : EditorWindow
+public class AnimationDataWindow : EditorWindow, IUpdateProgress
 {
     //string myString = "Hello World";
     //bool groupEnabled;
@@ -54,19 +55,14 @@ public class AnimationDataWindow : EditorWindow
 
         if (GUILayout.Button("Motion Similarity")) {
             Debug.ClearDeveloperConsole();
-            ms_.Do();
+            ms_.CalcMotionSimilarity(this);
+            EditorUtility.ClearProgressBar();
         }
 
         if (GUILayout.Button("Play Motion")) {
             Debug.ClearDeveloperConsole();
             PlaySimilarMotion(animFig0_, animFig1_);
-        }
-
-
-        //if (animation_ != null)
-        //{
-        //    LoadAnimationData();
-        //}
+        }        
     }
 
 
@@ -208,6 +204,7 @@ public class AnimationDataWindow : EditorWindow
             }
         }
 
+
         Debug.LogFormat("feature data {0} frames {1} joints {2} floats", numSamples, joints.Length, numSamples * joints.Length * 2);
         Debug.LogFormat("num beats {0} num filtered samples {1}", frameData.numBeats, frameData.numBeats * MotionSimilarity.NumSamplesPerBeat);
 
@@ -271,7 +268,7 @@ public class AnimationDataWindow : EditorWindow
             
             var path = Path.GetDirectoryName(resName);
             path = Path.Combine(path, "motion_feature.bin");
-
+            
             Transform[] joints = new Transform[jointName.Length];
 
             for (int i = 0; i < jointName.Length; i++) {
@@ -285,9 +282,9 @@ public class AnimationDataWindow : EditorWindow
             }
 
             ExtractingMotionFeatures(joints, animation, motion, path);
-
-            break;
         }
+
+        Debug.Log("Done!");
     }
 
     void PlaySimilarMotion(GameObject go0, GameObject go1) {
@@ -297,20 +294,24 @@ public class AnimationDataWindow : EditorWindow
 
         Debug.LogFormat("curr {0} index {1} value {2}", CurrIndex, i, cost[i]);
         CurrIndex++;
-
-        //var miniFrame = ms_.GetMinimunCostFrame();
-
+        
         var miniFrame = ms_.MotionFrameByIndex(i);
 
-        var frame0 = ms_.GetFrameData(miniFrame.index0);
-        var frame1 = ms_.GetFrameData(miniFrame.index1);
+        int motion = 0, beat = 0;
+        ms_.IndexToMotionClip(miniFrame.index0, ref motion, ref beat);
+        var frame = ms_.GetFrameData(motion);
+        PrepareSimilarMotion(go0, frame, beat);
 
-        Debug.LogFormat("mini cost {0}, song({1}, {2}), {3}, {4}",
-            miniFrame.minCost, frame0.name, frame1.name,
-            miniFrame.beat0, miniFrame.beat1);
+        Debug.LogFormat("mini cost {0}, song {1} beat {2}",
+            miniFrame.minCost, frame.name, beat);
 
-        PrepareSimilarMotion(go0, frame0, miniFrame.beat0);
-        PrepareSimilarMotion(go1, frame1, miniFrame.beat1);
+        ms_.IndexToMotionClip(miniFrame.index1, ref motion, ref beat);
+        frame = ms_.GetFrameData(motion);
+        PrepareSimilarMotion(go1, frame, beat);
+
+        Debug.LogFormat("mini cost {0}, song {1} beat {2}",
+            miniFrame.minCost, frame.name, beat);
+
     }
 
     void PrepareSimilarMotion(GameObject go, MotionSimilarity.FrameData frame, int beat) {
@@ -332,5 +333,8 @@ public class AnimationDataWindow : EditorWindow
         script.Init();
     }
 
+    void IUpdateProgress.Update(string info, float progress) {
+        EditorUtility.DisplayProgressBar("CalcMotionSimilarity", info, progress);
+    }
 }
 
