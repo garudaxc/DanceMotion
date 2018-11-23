@@ -3,13 +3,14 @@ import numpy as np
 from tensorflow.contrib import rnn
 import os.path
 import MotionFeature
+import matplotlib.pyplot as plt
 
 root = './resource/'
 numHidden = 26
 batchSize = 64
 numSteps = 7
 inputDim = 294
-numLayers = 2
+numLayers = 1
 lableDim = 1
 learning_rate = 0.001
 
@@ -68,8 +69,10 @@ def PrepareTrainData():
             print('error, can not find file ', name)
             continue
 
-        music = MotionFeature.PrepareMusicFeature(f)
-        motion = MotionFeature.PrepareMotionFeature(f)
+        music = MotionFeature.PrepareMusicFeature(name)
+
+        mFeatureName = os.path.join(root, f, 'motion_feature.bin')
+        motion = MotionFeature.PrepareMotionFeature(mFeatureName)
 
         assert music.shape[0] == motion.shape[0]
 
@@ -89,6 +92,12 @@ def PrepareTrainData():
     numBeats, motionCost = MotionFeature.LoadMotionSimilarity()
     totalBeats = sum(numBeats)
     assert totalBeats == motionFeatures.shape[0]
+
+    plt.plot(motionCost)
+    plt.show()
+
+    return
+
 
     totalCost = (totalBeats * (totalBeats - 1)) / 2
     assert totalCost == motionCost.shape[0]
@@ -121,7 +130,7 @@ def PrepareTrainData():
 
     SaveModel(sess, ModelFileName, True)
     
-    epch = 300
+    epch = 400
     currentTrainLoss = np.inf
     notImproveCount = 0
     for j in range(epch):
@@ -260,6 +269,15 @@ def BuildRnn():
 
 
 def Regress():    
+    testMusic = '../../test/siren/siren.mp3'
+    filename = os.path.abspath(testMusic)
+    music = MotionFeature.PrepareMusicFeature(filename)    
+    music = music.reshape(-1, 1, numSteps, music.shape[-1])
+
+    music = music.repeat(batchSize, axis=1)
+    print('music feature', music.shape)
+    
+    # load motion features
     files = os.listdir(root)
     files.sort()    
 
@@ -269,17 +287,27 @@ def Regress():
         name = os.path.join(root, f)
         if not os.path.isdir(name):
             continue
-        name = os.path.join(root, f, f) + '.mp3'
+        name = os.path.join(root, f, 'motion_feature.bin')
         if not os.path.exists(name):
             print('error, can not find file ', name)
             continue
 
-        motion = MotionFeature.PrepareMotionFeature(f)
+        motion = MotionFeature.PrepareMotionFeature(name)
         motion = motion.reshape(-1, 7, motion.shape[-1])
 
         motionFeatures.append(motion)
 
     motionFeatures = np.concatenate(motionFeatures)
+    print('motion feature', motionFeatures.shape)
+    
+    motionBeats = motionFeatures.shape[0]
+    numBatches = int(motionBeats / batchSize)
+    print('num batches ', numBatches)
+    motionFeatures = motionFeatures[:numBatches * batchSize]
+    motionFeatures = motionFeatures.reshape(-1, batchSize, motionFeatures.shape[1], motionFeatures.shape[2])
+    print('motion feature', motionFeatures.shape)
+    
+
     
     graphFile = ModelFileName + '.meta'
     saver = tf.train.import_meta_graph(graphFile)
@@ -292,9 +320,30 @@ def Regress():
         predict_op = tf.get_default_graph().get_tensor_by_name("predict_op:0")
         print('predict_op', predict_op)         
         X = tf.get_default_graph().get_tensor_by_name('X:0')
-        seqLen = tf.get_default_graph().get_tensor_by_name('seqLen:0')
+        seqLenHolder = tf.get_default_graph().get_tensor_by_name('seqLen:0')
         #output_state = tf.get_default_graph().get_tensor_by_name('output_state:0')
         #input_state = tf.get_default_graph().get_tensor_by_name('input_state:0')
+        seqLen = np.array([numSteps] * batchSize)
+
+        epch = music.shape[0]
+        for i in range(1):
+            print(i)
+            feature = music[i]
+            feature = feature[np.newaxis, ::]
+            feature = feature.repeat(numBatches, axis=0)
+            feature = np.concatenate((feature, motionFeatures), axis=3)
+            print('feature', feature.shape)
+
+            for j in range(5):
+                feed_dict={X:feature[j], seqLenHolder:seqLen}        
+                res = sess.run([predict_op], feed_dict=feed_dict)
+                print(res)
+
+
+
+
+
+
 
 
 
@@ -303,10 +352,10 @@ def Test():
     os.chdir(dir)
     print(os.path.abspath('.'))
 
-    #PrepareTrainData()
+    PrepareTrainData()
+    #Regress()
     #BuildRnn()
 
-    Regress()
 
     #indices = np.arange(0, 20, dtype=np.int32)
     #np.random.shuffle(indices)

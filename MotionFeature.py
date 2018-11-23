@@ -5,8 +5,8 @@ from struct import *
 import numpy as np
 import os
 import matplotlib.pyplot as plt
-import postprocess
-import LevelInfo
+#import postprocess
+#import LevelInfo
 import myprocesser
 import librosa
 
@@ -41,8 +41,8 @@ def GetMp3PathName(song):
     path = 'i:/work/DanceMotion/Assets/DanceMotion/resource/%s/%s.mp3' % (song, song)
     return path
 
-def GetMotionFeature(song):
-    pathname = 'i:/work/DanceMotion/Assets/DanceMotion/resource/%s/motion_feature.bin' % (song)
+def GetMotionFeature(pathname):
+    #pathname = 'i:/work/DanceMotion/Assets/DanceMotion/resource/%s/motion_feature.bin' % (song)
     with open(pathname, 'rb') as file:
         data = file.read()
 
@@ -52,9 +52,9 @@ def LoadMusicInfo(filename):
     '''
     读取歌曲的长度,bpm,entertime等信息
     '''
-    # filename = r'd:\librosa\RhythmMaster\jilejingtu\jilejingtu.mp3'
     dir = os.path.dirname(filename) + os.path.sep
     filename = dir + 'info.txt'
+    
     with open(filename, 'r') as file:
         value = [s.strip('\n').split('=') for s in file.readlines()]
         info ={}
@@ -64,11 +64,9 @@ def LoadMusicInfo(filename):
         return info
 
 
-def PrepareMusicFeature(song):
-
-    # music info
-    pathname = GetMp3PathName(song)
-    musicInfo = LoadMusicInfo(pathname)
+def PrepareMusicFeature(filename):
+    
+    musicInfo = LoadMusicInfo(filename)
     
     bpm = musicInfo["bpm"]
     enterTime = musicInfo["et"]
@@ -89,7 +87,7 @@ def PrepareMusicFeature(song):
     fps = 1.0 / (beat / 7.0)
 
     processer = myprocesser.CreateMFCCProcesserForMotion(fps, start=start, stop=end)
-    feature = processer(pathname)
+    feature = processer(filename)
 
     if feature.shape[0] != numFrames:
         feature = feature[:numFrames, :]
@@ -103,8 +101,6 @@ def PrepareMusicFeature(song):
 
 
 def PrepareMotionFeature(song='ah'):
-    # music info
-    pathname = GetMp3PathName(song)
 
     data = GetMotionFeature(song)
 
